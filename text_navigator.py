@@ -1,6 +1,7 @@
 import os.path
 import time
 from typing import List
+from typing import Dict as _
 
 import docx
 import pymupdf
@@ -8,7 +9,7 @@ import pymupdf
 from exceptions import *
 from general import NavOption, get_docx_content
 
-
+a = _[int, int]
 class TextNavigator:
     _nav_option: NavOption  # Опция навигации - страница или абзац
     _file_path: str  # Путь к текстовому файлу
@@ -32,16 +33,20 @@ class TextNavigator:
         match self._extension:
             case '.docx':
                 self._set_docx_content()
-            case '.pdf':
-                self._set_pdf_content()
+            case '.pdf' | '.epub' | '.fb2':
+                self._set_pypdf_content()
             case _:
                 raise UnsupportedFormatError(f'Неподдерживаемое расширение файла: {self._file_path}')
         # print(self._file_content)
-        # print('\n\nParagraph positions:\n\n')
-        # print(self._par_positions)
-        # print('\n\nPage positions:\n\n')
-        # print(self._page_positions)
-        # print(f'\n\nFile content with one page: {self._file_content[3266:3713]}')
+        print('\n\nParagraph positions:\n\n')
+        print(self._par_positions)
+        print('\n\nPage positions:\n\n')
+        print(self._page_positions)
+        print(f'\n\nFile content with one page: {self._file_content[305:423]}')
+        print(f'\n\nFile content with one page: {self._file_content[423:2199]}')
+        print(f'\n\nFile content with one page: {self._file_content[13154:15492]}')
+        # print(f'\n\nFile content with one page: {self._file_content[13154:13530]}')
+        # print(f'\n\nFile content with one page: {self._file_content[13892:14137]}')
 
     # INFO: private methods
 
@@ -65,7 +70,7 @@ class TextNavigator:
         self._file_content = '\n'.join(content_chunks)
         # print(f'File content length: {len(self._file_content)}, current position: {current_position}, file_content: \n\n{self._file_content[1069:1139]}')
 
-    def _set_pdf_content(self):
+    def _set_pypdf_content(self):
         doc = pymupdf.open(self._file_path)
         index = -1
         text_position = 0
@@ -81,6 +86,11 @@ class TextNavigator:
                 par_blocks.append(block)
             self._page_positions.append(text_position)
         self._file_content = ''.join(par_blocks)
+
+    # def _set_epub_content(self):
+    #     doc = pymupdf.open(self._file_path)
+    #     for page in doc:
+    #         print(f'\n\nCurrent page:\n\n{page.get_textpage().extractBLOCKS()}')
 
     # INFO: end block
 
@@ -133,11 +143,11 @@ class TextNavigator:
 def test_navigator(file_path: str):
     start_time = time.time()
     navigator = TextNavigator(file_path)
-    print(navigator.get_next_pos(1069))
-    navigator.set_nav_option(NavOption.PAGE)
-    print(navigator.get_next_pos(1069))
+    # print(navigator.get_next_pos(1069))
+    # navigator.set_nav_option(NavOption.PAGE)
+    # print(navigator.get_next_pos(1069))
     end_time = time.time()
     print(f'Total time: {(end_time - start_time)}')
 
 
-test_navigator(os.path.abspath('test_files/pdf.pdf'))
+test_navigator(os.path.abspath('test_files/fb2.fb2'))
