@@ -1,6 +1,4 @@
 from enum import IntEnum
-import docx
-import bisect
 from docx import Document
 
 
@@ -23,16 +21,6 @@ SUPPORTED_FORMATS = [
     'epub'
 ]
 """Список будет дополняться со временем"""
-
-
-def find_next_index(sorted_list, number):
-    index = bisect.bisect_right(sorted_list, number)
-
-    # Проверить, есть ли следующий элемент в списке
-    if index < len(sorted_list):
-        return sorted_list[index]
-    else:
-        return None
 
 
 def read_python_docx(doc: Document):

@@ -6,7 +6,7 @@ from typing import List
 import docx
 
 from exceptions import *
-from general import NavOption
+from general import NavOption, read_python_docx
 
 
 class TextNavigator:
@@ -37,10 +37,12 @@ class TextNavigator:
             case _:
                 raise UnsupportedFormatError(f'Неподдерживаемое расширение файла: {self._file_path}')
         # print(self._file_content)
-        print('\n\nParagraph positions:\n\n')
-        print(self._par_positions)
-        print('\n\nPage positions:\n\n')
-        print(self._page_positions)
+        # print('\n\nParagraph positions:\n\n')
+        # print(self._par_positions)
+        # print('\n\nPage positions:\n\n')
+        # print(self._page_positions)
+
+    # INFO: private methods
 
     def _get_par_page_positions_and_set_content(self, **kwargs):
         if 'docx' in kwargs:
@@ -60,18 +62,6 @@ class TextNavigator:
             self._file_content = '\n'.join(content_chunks)
             # print(f'File content length: {len(self._file_content)}, current position: {current_position}, file_content: \n\n{self._file_content[1069:1139]}')
 
-    def set_nav_option(self, option: NavOption):
-        self._nav_option = option
-
-    def get_next(self, position: int) -> int:
-        """Возвращает позицию начала следующей опции навигации
-        (параграфа или страницы) в тексте после position"""
-        match self._nav_option:
-            case NavOption.PARAGRAPH:
-                return self._get_next_par_position(position)
-            case NavOption.PAGE:
-                return self._get_next_page_position(position)
-
     def _get_next_par_position(self, position: int):
         match self._extension:
             case '.docx':
@@ -88,13 +78,70 @@ class TextNavigator:
                         return page_pos
                 return -1
 
+    def _get_prev_par_position(self, position: int):
+        match self._extension:
+            case '.docx':
+                for par_pos in reversed(self._par_positions):
+                    if par_pos < position:
+                        return par_pos
+                return -1
+
+    def _get_prev_page_position(self, position: int):
+        match self._extension:
+            case '.docx':
+                for page_pos in reversed(self._page_positions):
+                    if page_pos < position:
+                        return page_pos
+                return -1
+
+    # INFO: public methods
+
+    def set_nav_option(self, option: NavOption):
+        """Установить опцию навигации - на данный момент страница или параграф"""
+        self._nav_option = option
+
+    def get_next_pos(self, position: int) -> int:
+        """Возвращает позицию начала следующей опции навигации
+        (параграфа или страницы) в тексте после position"""
+        match self._nav_option:
+            case NavOption.PARAGRAPH:
+                return self._get_next_par_position(position)
+            case NavOption.PAGE:
+                return self._get_next_page_position(position)
+
+    def get_prev_pos(self, position: int) -> int:
+        """Возвращает позицию начала предыдущей опции навигации
+        (параграфа или страницы) в тексте после position"""
+        match self._nav_option:
+            case NavOption.PARAGRAPH:
+                return self._get_prev_par_position(position)
+            case NavOption.PAGE:
+                return self._get_prev_page_position(position)
+
+    @staticmethod
+    def get_file_content(text_file_path: str) -> str:
+        """
+        Вспомогательный метод для уверенности, что читаемое содержимое
+        и содержимое для поиска позиций навигации созданы единообразно
+        """
+        last_dot_position = text_file_path.rfind('.')
+        if last_dot_position == -1:
+            raise ExtensionAbsentError(f'Отсутствует расширение файла: {text_file_path}')
+        extension = text_file_path[last_dot_position:]
+        match extension:
+            case '.docx':
+                document: docx.Document = docx.Document(text_file_path)
+                return read_python_docx(document)
+            case _:
+                raise UnsupportedFormatError(f'Неподдерживаемое расширение файла: {text_file_path}')
+
 
 def test_navigator(file_path: str):
     start_time = time.time()
     navigator = TextNavigator(file_path)
-    print(navigator.get_next(1069))
+    print(navigator.get_next_pos(1069))
     navigator.set_nav_option(NavOption.PAGE)
-    print(navigator.get_next(1069))
+    print(navigator.get_next_pos(1069))
     end_time = time.time()
     print(f'Total time: {(end_time - start_time)}')
 
