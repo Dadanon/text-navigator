@@ -4,3 +4,7 @@ class UnsupportedFormatError(Exception):
 
 class ExtensionAbsentError(Exception):
     pass
+
+
+class UnknownNavOptionError(Exception):
+    pass

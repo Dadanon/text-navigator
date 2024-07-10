@@ -84,37 +84,27 @@ class TextNavigator:
 
     # INFO: end block
 
-    def _get_next_par_position(self, position: int):
-        match self._extension:
-            case '.docx':
-                for par_pos in self._par_positions:
-                    if par_pos > position:
-                        return par_pos
-                return -1
+    @property
+    def _nav_positions(self) -> List[int]:
+        match self._nav_option:
+            case NavOption.PARAGRAPH:
+                return self._par_positions
+            case NavOption.PAGE:
+                return self._page_positions
+            case _:
+                raise UnknownNavOptionError("Неизвестная опция навигации")
 
-    def _get_next_page_position(self, position: int):
-        match self._extension:
-            case '.docx':
-                for page_pos in self._page_positions:
-                    if page_pos > position:
-                        return page_pos
-                return -1
+    def _get_next_position(self, position: int):
+        for pos in self._nav_positions:
+            if pos > position:
+                return pos
+        return -1
 
-    def _get_prev_par_position(self, position: int):
-        match self._extension:
-            case '.docx':
-                for par_pos in reversed(self._par_positions):
-                    if par_pos < position:
-                        return par_pos
-                return -1
-
-    def _get_prev_page_position(self, position: int):
-        match self._extension:
-            case '.docx':
-                for page_pos in reversed(self._page_positions):
-                    if page_pos < position:
-                        return page_pos
-                return -1
+    def _get_prev_position(self, position: int):
+        for pos in reversed(self._nav_positions):
+            if pos < position:
+                return pos
+        return -1
 
     # INFO: public methods
 
@@ -125,20 +115,12 @@ class TextNavigator:
     def get_next_pos(self, position: int) -> int:
         """Возвращает позицию начала следующей опции навигации
         (параграфа или страницы) в тексте после position"""
-        match self._nav_option:
-            case NavOption.PARAGRAPH:
-                return self._get_next_par_position(position)
-            case NavOption.PAGE:
-                return self._get_next_page_position(position)
+        return self._get_next_position(position)
 
     def get_prev_pos(self, position: int) -> int:
         """Возвращает позицию начала предыдущей опции навигации
         (параграфа или страницы) в тексте после position"""
-        match self._nav_option:
-            case NavOption.PARAGRAPH:
-                return self._get_prev_par_position(position)
-            case NavOption.PAGE:
-                return self._get_prev_page_position(position)
+        return self._get_prev_position(position)
 
     def get_file_content(self) -> str:
         """
@@ -151,9 +133,9 @@ class TextNavigator:
 def test_navigator(file_path: str):
     start_time = time.time()
     navigator = TextNavigator(file_path)
-    # print(navigator.get_next_pos(1069))
-    # navigator.set_nav_option(NavOption.PAGE)
-    # print(navigator.get_next_pos(1069))
+    print(navigator.get_next_pos(1069))
+    navigator.set_nav_option(NavOption.PAGE)
+    print(navigator.get_next_pos(1069))
     end_time = time.time()
     print(f'Total time: {(end_time - start_time)}')
 
