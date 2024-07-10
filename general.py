@@ -3,7 +3,6 @@ from enum import IntEnum
 import docx
 import pymupdf
 from docx import Document
-from pypdf import PdfReader
 
 
 class NavOption(IntEnum):
