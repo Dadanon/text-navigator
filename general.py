@@ -1,5 +1,9 @@
 from enum import IntEnum
+
+import docx
+import pymupdf
 from docx import Document
+from pypdf import PdfReader
 
 
 class NavOption(IntEnum):
@@ -23,8 +27,9 @@ SUPPORTED_FORMATS = [
 """Список будет дополняться со временем"""
 
 
-def read_python_docx(doc: Document):
-    full_text = [para.text for para in doc.paragraphs]
+def get_docx_content(text_file_path: str):
+    document: docx.Document = docx.Document(text_file_path)
+    full_text = [para.text for para in document.paragraphs]
     return '\n'.join(full_text)
 
 

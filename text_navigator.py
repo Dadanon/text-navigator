@@ -1,12 +1,12 @@
 import os.path
-import re
 import time
 from typing import List
 
 import docx
+import pymupdf
 
 from exceptions import *
-from general import NavOption, read_python_docx
+from general import NavOption, get_docx_content
 
 
 class TextNavigator:
@@ -31,9 +31,9 @@ class TextNavigator:
         self._extension = self._file_path[last_dot_position:]
         match self._extension:
             case '.docx':
-                doc = docx.Document(text_file_path)
-                self._get_par_page_positions_and_set_content(docx=doc)
-                # print(len(self._file_content))
+                self._set_docx_content()
+            case '.pdf':
+                self._set_pdf_content()
             case _:
                 raise UnsupportedFormatError(f'Неподдерживаемое расширение файла: {self._file_path}')
         # print(self._file_content)
@@ -41,26 +41,48 @@ class TextNavigator:
         # print(self._par_positions)
         # print('\n\nPage positions:\n\n')
         # print(self._page_positions)
+        # print(f'\n\nFile content with one page: {self._file_content[3266:3713]}')
 
     # INFO: private methods
 
-    def _get_par_page_positions_and_set_content(self, **kwargs):
-        if 'docx' in kwargs:
-            document: docx.Document = kwargs['docx']
-            content_chunks = []
-            current_position: int = 0
-            for par in document.paragraphs:
-                content_chunks.append(par.text)
-                for i in range(len(par.runs)):
-                    if 'lastRenderedPageBreak' in par.runs[i]._element.xml:
-                        runs_before = par.runs[:i]
-                        runs_before_length = 0 if len(runs_before) == 0 else sum(map(lambda run: len(run.text), runs_before))
-                        self._page_positions.append(current_position + runs_before_length)
-                self._par_positions.append(current_position)
-                current_position += len(par.text) + 1
-            current_position -= 1  # Удаляем последний символ, т.к. следующая строка с join не добавляет \n в конце
-            self._file_content = '\n'.join(content_chunks)
-            # print(f'File content length: {len(self._file_content)}, current position: {current_position}, file_content: \n\n{self._file_content[1069:1139]}')
+    # INFO: setting content for different formats block
+
+    def _set_docx_content(self):
+        document: docx.Document = docx.Document(self._file_path)
+        content_chunks = []
+        current_position: int = 0
+        for par in document.paragraphs:
+            content_chunks.append(par.text)
+            for i in range(len(par.runs)):
+                if 'lastRenderedPageBreak' in par.runs[i]._element.xml:
+                    runs_before = par.runs[:i]
+                    runs_before_length = 0 if len(runs_before) == 0 else sum(
+                        map(lambda run: len(run.text), runs_before))
+                    self._page_positions.append(current_position + runs_before_length)
+            self._par_positions.append(current_position)
+            current_position += len(par.text) + 1
+        current_position -= 1  # Удаляем последний символ, т.к. следующая строка с join не добавляет \n в конце
+        self._file_content = '\n'.join(content_chunks)
+        # print(f'File content length: {len(self._file_content)}, current position: {current_position}, file_content: \n\n{self._file_content[1069:1139]}')
+
+    def _set_pdf_content(self):
+        doc = pymupdf.open(self._file_path)
+        index = -1
+        text_position = 0
+        par_blocks = []
+        for page in doc:  # iterate the document pages
+            index += 1
+            page_blocks = page.get_textpage().extractBLOCKS()
+            page_blocks_sorted = sorted(page_blocks, key=lambda coords: (coords[3], coords[0]))
+            page_blocks_mapped = map(lambda block: block[4].replace('\n', ' '), page_blocks_sorted)
+            for block in page_blocks_mapped:
+                text_position += len(block)
+                self._par_positions.append(text_position)
+                par_blocks.append(block)
+            self._page_positions.append(text_position)
+        self._file_content = ''.join(par_blocks)
+
+    # INFO: end block
 
     def _get_next_par_position(self, position: int):
         match self._extension:
@@ -118,32 +140,22 @@ class TextNavigator:
             case NavOption.PAGE:
                 return self._get_prev_page_position(position)
 
-    @staticmethod
-    def get_file_content(text_file_path: str) -> str:
+    def get_file_content(self) -> str:
         """
         Вспомогательный метод для уверенности, что читаемое содержимое
         и содержимое для поиска позиций навигации созданы единообразно
         """
-        last_dot_position = text_file_path.rfind('.')
-        if last_dot_position == -1:
-            raise ExtensionAbsentError(f'Отсутствует расширение файла: {text_file_path}')
-        extension = text_file_path[last_dot_position:]
-        match extension:
-            case '.docx':
-                document: docx.Document = docx.Document(text_file_path)
-                return read_python_docx(document)
-            case _:
-                raise UnsupportedFormatError(f'Неподдерживаемое расширение файла: {text_file_path}')
+        return self._file_content
 
 
 def test_navigator(file_path: str):
     start_time = time.time()
     navigator = TextNavigator(file_path)
-    print(navigator.get_next_pos(1069))
-    navigator.set_nav_option(NavOption.PAGE)
-    print(navigator.get_next_pos(1069))
+    # print(navigator.get_next_pos(1069))
+    # navigator.set_nav_option(NavOption.PAGE)
+    # print(navigator.get_next_pos(1069))
     end_time = time.time()
     print(f'Total time: {(end_time - start_time)}')
 
 
-test_navigator(os.path.abspath('test_files/docx.docx'))
+test_navigator(os.path.abspath('test_files/pdf.pdf'))
