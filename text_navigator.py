@@ -1,7 +1,7 @@
 import os.path
 import re
 import time
-from typing import List
+from typing import List, Optional, Tuple
 
 import docx
 import pymupdf
@@ -41,11 +41,11 @@ class TextNavigator:
             case _:
                 raise UnsupportedFormatError(f'Неподдерживаемое расширение файла: {self._file_path}')
         # print(self._file_content)
-        # print('\n\nParagraph positions:\n\n')
-        # print(self._par_positions)
-        # print('\n\nPage positions:\n\n')
-        # print(self._page_positions)
-        # print(f'\n\nFile content with one page: {self._file_content[49:60]}')
+        print('\n\nParagraph positions:\n\n')
+        print(self._par_positions)
+        print('\n\nPage positions:\n\n')
+        print(self._page_positions)
+        print(f'\n\nFile content with one page: {self._file_content[1624:]}')
 
     # INFO: private methods
 
@@ -139,17 +139,30 @@ class TextNavigator:
             case _:
                 raise UnknownNavOptionError("Неизвестная опция навигации")
 
-    def _get_next_position(self, position: int):
-        for pos in self._nav_positions:
-            if pos > position:
-                return pos
-        return -1
+    def _get_next_fragment(self, position: int) -> Optional[Tuple[int, Optional[int]]]:
+        for i in range(len(self._nav_positions)):
+            if self._nav_positions[i] > position:
+                start_position = self._nav_positions[i]
+                if len(self._file_content[start_position:]) == 0:
+                    return None  # Вернуть None, если start_position - последняя позиция
+                try:
+                    end_position = self._nav_positions[i + 1]
+                    return start_position, end_position
+                except IndexError:
+                    return start_position, None  # Гипотетический случай, который, скорее всего, никогда не произойдет :)
+        return None
 
-    def _get_prev_position(self, position: int):
-        for pos in reversed(self._nav_positions):
-            if pos < position:
-                return pos
-        return -1
+    def _get_prev_fragment(self, position: int) -> Optional[Tuple[int, Optional[int]]]:
+        nav_positions_reversed = self._nav_positions[::-1]
+        for i in range(len(nav_positions_reversed)):
+            if nav_positions_reversed[i] < position:
+                start_position = nav_positions_reversed[i]
+                try:
+                    end_position = self._nav_positions[i - 1]
+                    return start_position, end_position
+                except IndexError:
+                    return start_position, None
+        return None
 
     # INFO: public methods
 
@@ -157,15 +170,15 @@ class TextNavigator:
         """Установить опцию навигации - на данный момент страница или параграф"""
         self._nav_option = option
 
-    def get_next_pos(self, position: int) -> int:
-        """Возвращает позицию начала следующей опции навигации
+    def get_next_fragment(self, position: int) -> Optional[Tuple[int, Optional[int]]]:
+        """Возвращает диапазон позиций следующей опции навигации
         (параграфа или страницы) в тексте после position"""
-        return self._get_next_position(position)
+        return self._get_next_fragment(position)
 
-    def get_prev_pos(self, position: int) -> int:
-        """Возвращает позицию начала предыдущей опции навигации
+    def get_prev_fragment(self, position: int) -> Optional[Tuple[int, Optional[int]]]:
+        """Возвращает диапазон позиций предыдущей опции навигации
         (параграфа или страницы) в тексте после position"""
-        return self._get_prev_position(position)
+        return self._get_prev_fragment(position)
 
     def get_file_content(self) -> str:
         """
@@ -178,9 +191,9 @@ class TextNavigator:
 def test_navigator(file_path: str):
     start_time = time.time()
     navigator = TextNavigator(file_path)
-    print(navigator.get_next_pos(150))
-    navigator.set_nav_option(NavOption.PAGE)
-    print(navigator.get_next_pos(77))
+    print(navigator.get_next_fragment(1609))
+    # navigator.set_nav_option(NavOption.PAGE)
+    # print(navigator.get_next_fragment(77))
     end_time = time.time()
     print(f'Total time: {(end_time - start_time)}')
 

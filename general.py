@@ -1,5 +1,4 @@
 from enum import IntEnum
-import re
 
 
 class NavOption(IntEnum):
