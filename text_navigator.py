@@ -1,4 +1,5 @@
 import os.path
+import re
 import time
 from typing import List
 
@@ -6,7 +7,7 @@ import docx
 import pymupdf
 
 from exceptions import *
-from general import NavOption
+from general import NavOption, try_open_txt, LINE_LENGTH_MAX, LINES_ON_HTML_PAGE
 
 
 class TextNavigator:
@@ -34,6 +35,9 @@ class TextNavigator:
                 self._set_docx_content()
             case '.pdf' | '.epub' | '.fb2':
                 self._set_pypdf_content()
+            case '.htm' | '.html':
+                html_content = try_open_txt(self._file_path)
+                self._set_html_content(html_content)
             case _:
                 raise UnsupportedFormatError(f'Неподдерживаемое расширение файла: {self._file_path}')
         # print(self._file_content)
@@ -41,15 +45,53 @@ class TextNavigator:
         # print(self._par_positions)
         # print('\n\nPage positions:\n\n')
         # print(self._page_positions)
-        # print(f'\n\nFile content with one page: {self._file_content[305:423]}')
-        # print(f'\n\nFile content with one page: {self._file_content[423:2199]}')
-        # print(f'\n\nFile content with one page: {self._file_content[13154:15492]}')
-        # print(f'\n\nFile content with one page: {self._file_content[13154:13530]}')
-        # print(f'\n\nFile content with one page: {self._file_content[13892:14137]}')
+        # print(f'\n\nFile content with one page: {self._file_content[49:60]}')
 
     # INFO: private methods
 
     # INFO: setting content for different formats block
+
+    def _set_html_content(self, content: str):
+        # Удалим все скрипты и стили
+        clean_html = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', content, flags=re.DOTALL)
+
+        # Удалим все HTML теги
+        plain_text = re.sub(r'<[^>]+>', '', clean_html)
+
+        # Удалим пробелы и переводы строк в начале и в конце строк
+        plain_text = plain_text.strip()
+
+        # Заменим большое количество пробелов на знак переноса
+        plain_text = re.sub('\s{2,}', '\n', plain_text)
+
+        self._file_content = plain_text
+
+        # Теперь устанавливаем позиции параграфов и страниц.
+        # Позиции параграфов легко установить по знаку разделителя
+        # \n, который мы добавили.
+        # Позиции страниц - виртуальные, по примеру из Word:
+        # максимум 120 символов в строке, максимум 52 строки на странице.
+        lines_count = 0
+        start_position = 0
+        content_pars = self._file_content.split('\n')
+        # Добавляем первый абзац и первую страницу
+        self._par_positions.append(start_position)
+        self._page_positions.append(start_position)
+        for par in content_pars:
+            par_length = len(par)
+            # Добавляем позиции абзацев
+            start_position += par_length + 1
+            self._par_positions.append(start_position)
+            # Добавляем позиции страниц
+            par_lines = 1 + par_length // LINE_LENGTH_MAX  # Количество строк, занимаемое абзацем
+            if (lines_count + par_lines) == LINES_ON_HTML_PAGE:
+                self._page_positions.append(start_position)
+                lines_count = 0
+            elif (lines_count + par_lines) > LINES_ON_HTML_PAGE:
+                self._page_positions.append(start_position - par_length)
+                lines_count = par_lines
+            else:
+                lines_count += par_lines
 
     def _set_docx_content(self):
         document: docx.Document = docx.Document(self._file_path)
@@ -136,11 +178,11 @@ class TextNavigator:
 def test_navigator(file_path: str):
     start_time = time.time()
     navigator = TextNavigator(file_path)
-    # print(navigator.get_next_pos(1069))
-    # navigator.set_nav_option(NavOption.PAGE)
-    # print(navigator.get_next_pos(1069))
+    print(navigator.get_next_pos(150))
+    navigator.set_nav_option(NavOption.PAGE)
+    print(navigator.get_next_pos(77))
     end_time = time.time()
     print(f'Total time: {(end_time - start_time)}')
 
 
-test_navigator(os.path.abspath('test_files/fb2.fb2'))
+test_navigator(os.path.abspath('test_files/html.html'))
