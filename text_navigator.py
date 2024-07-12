@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple
 
 import docx
 import pymupdf
+from bs4 import BeautifulSoup
 
 from exceptions import *
 from general import NavOption, try_open_txt, LINE_LENGTH_MAX, LINES_ON_HTML_PAGE
@@ -36,20 +37,50 @@ class TextNavigator:
             case '.pdf' | '.epub' | '.fb2':
                 self._set_pypdf_content()
             case '.htm' | '.html':
-                html_content = try_open_txt(self._file_path)
-                self._set_html_content(html_content)
+                content = try_open_txt(self._file_path)
+                self._set_html_content(content)
+            case '.xml':
+                content = try_open_txt(self._file_path)
+                self._set_xml_content(content)
             case _:
                 raise UnsupportedFormatError(f'Неподдерживаемое расширение файла: {self._file_path}')
-        # print(self._file_content)
-        print('\n\nParagraph positions:\n\n')
-        print(self._par_positions)
-        print('\n\nPage positions:\n\n')
-        print(self._page_positions)
-        print(f'\n\nFile content with one page: {self._file_content[1624:]}')
+        print(self._file_content)
+        # print('\n\nParagraph positions:\n\n')
+        # print(self._par_positions)
+        # print('\n\nPage positions:\n\n')
+        # print(self._page_positions)
+        # print(f'\n\nFile content with one page: {self._file_content[45:71]}')
 
     # INFO: private methods
 
     # INFO: setting content for different formats block
+
+    def _set_xml_content(self, content: str):
+        content = re.sub(r'<\?xml.*?>\n', '', content)
+        content = re.sub(r'\s{2,}', '\n', content)
+        content = re.sub(r'</.*?>', ' ', content)
+        tag_matches = re.finditer(r'<([^>].*?)>', content, re.DOTALL)
+        for tag_match in tag_matches:
+            tag = tag_match.group(1)
+            content = content.replace(tag, tag.split(' ')[0])
+        content = content.replace('<', '').replace('>', ': ')
+        content = re.sub(r'(\n\s*)', '\n', content)
+        # content = re.sub(r'\s{2,}', ' ', content)
+        self._file_content = content
+        content_chunks = self._file_content.split('\n')
+        start_position = 0
+        lines_count = 0
+        # Добавляем первый абзац и первую страницу
+        self._par_positions.append(start_position)
+        self._page_positions.append(start_position)
+        for chunk in content_chunks:
+            chunk_length = len(chunk)
+            lines_count += 1
+            start_position += chunk_length + 1
+            self._par_positions.append(start_position)
+            if lines_count == LINES_ON_HTML_PAGE:
+                self._page_positions.append(start_position)
+                lines_count = 0
 
     def _set_html_content(self, content: str):
         # Удалим все скрипты и стили
@@ -191,11 +222,11 @@ class TextNavigator:
 def test_navigator(file_path: str):
     start_time = time.time()
     navigator = TextNavigator(file_path)
-    print(navigator.get_next_fragment(1609))
+    # print(navigator.get_next_fragment(1609))
     # navigator.set_nav_option(NavOption.PAGE)
     # print(navigator.get_next_fragment(77))
     end_time = time.time()
     print(f'Total time: {(end_time - start_time)}')
 
 
-test_navigator(os.path.abspath('test_files/html.html'))
+test_navigator(os.path.abspath('test_files/xml2.xml'))

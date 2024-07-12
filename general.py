@@ -18,7 +18,7 @@ SUPPORTED_FORMATS = [
     'odt',
     'htm',  # Ready
     'html',  # Ready
-    'xml',
+    'xml',  # Ready
     'pdf',  # Ready
     'fb2',  # Ready
     'epub'  # Ready
