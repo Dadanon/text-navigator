@@ -2,10 +2,12 @@ import os.path
 import re
 import time
 from typing import List, Optional, Tuple
+from zipfile import ZipFile
+import shutil
 
 import docx
 import pymupdf
-from bs4 import BeautifulSoup
+from lxml import etree
 
 from exceptions import *
 from general import NavOption, try_open_txt, LINE_LENGTH_MAX, LINES_ON_HTML_PAGE
@@ -37,25 +39,68 @@ class TextNavigator:
             case '.pdf' | '.epub' | '.fb2':
                 self._set_pypdf_content()
             case '.htm' | '.html':
-                content = try_open_txt(self._file_path)
-                self._set_html_content(content)
+                self._set_html_content()
             case '.xml':
-                content = try_open_txt(self._file_path)
-                self._set_xml_content(content)
+                self._set_xml_content()
+            case '.odt':
+                self._set_odt_content()
             case _:
                 raise UnsupportedFormatError(f'Неподдерживаемое расширение файла: {self._file_path}')
         print(self._file_content)
-        # print('\n\nParagraph positions:\n\n')
-        # print(self._par_positions)
-        # print('\n\nPage positions:\n\n')
-        # print(self._page_positions)
-        # print(f'\n\nFile content with one page: {self._file_content[45:71]}')
+        print('\n\nParagraph positions:\n\n')
+        print(self._par_positions)
+        print('\n\nPage positions:\n\n')
+        print(self._page_positions)
+        print(f'\n\nFile content with one page: {self._file_content[1085:1309]}')
 
     # INFO: private methods
 
+    def _set_positions(self, chunks: List[str]):
+        start_position = 0
+        lines_count = 0
+        self._par_positions.append(start_position)
+        self._page_positions.append(start_position)
+        for par in chunks:
+            par_length = len(par)
+            # Добавляем позиции абзацев
+            start_position += par_length + 1
+            self._par_positions.append(start_position)
+            # Добавляем позиции страниц
+            par_lines = 1 + par_length // LINE_LENGTH_MAX  # Количество строк, занимаемое абзацем
+            if (lines_count + par_lines) == LINES_ON_HTML_PAGE:
+                self._page_positions.append(start_position)
+                lines_count = 0
+            elif (lines_count + par_lines) > LINES_ON_HTML_PAGE:
+                self._page_positions.append(start_position - par_length)
+                lines_count = par_lines
+            else:
+                lines_count += par_lines
+
     # INFO: setting content for different formats block
 
-    def _set_xml_content(self, content: str):
+    def _set_odt_content(self):
+        filename, _ = os.path.splitext(self._file_path)
+        temp_zip = filename + '.zip'
+        shutil.copy(self._file_path, temp_zip)
+        try:
+            with ZipFile(temp_zip, 'r') as zip_file:
+                with zip_file.open('content.xml') as xml_file:
+                    xml_content = xml_file.read()
+                    content = xml_content.decode('utf-8')
+        finally:
+            os.remove(temp_zip)
+        if not content:
+            raise ODTError("Файл content.xml отсутствует в ODT файле")
+        # Далее работаем как с xml файлом с особенными тегами
+        content_chunks = []
+        text_matches = re.finditer(r'>([^<].*?)<', content, re.DOTALL)
+        for text_match in text_matches:
+            content_chunks.append(text_match.group(1))
+        self._file_content = '\n'.join(content_chunks)
+        self._set_positions(content_chunks)
+
+    def _set_xml_content(self):
+        content = try_open_txt(self._file_path)
         content = re.sub(r'<\?xml.*?>\n', '', content)
         content = re.sub(r'\s{2,}', '\n', content)
         content = re.sub(r'</.*?>', ' ', content)
@@ -65,24 +110,11 @@ class TextNavigator:
             content = content.replace(tag, tag.split(' ')[0])
         content = content.replace('<', '').replace('>', ': ')
         content = re.sub(r'(\n\s*)', '\n', content)
-        # content = re.sub(r'\s{2,}', ' ', content)
         self._file_content = content
-        content_chunks = self._file_content.split('\n')
-        start_position = 0
-        lines_count = 0
-        # Добавляем первый абзац и первую страницу
-        self._par_positions.append(start_position)
-        self._page_positions.append(start_position)
-        for chunk in content_chunks:
-            chunk_length = len(chunk)
-            lines_count += 1
-            start_position += chunk_length + 1
-            self._par_positions.append(start_position)
-            if lines_count == LINES_ON_HTML_PAGE:
-                self._page_positions.append(start_position)
-                lines_count = 0
+        self._set_positions(self._file_content.split('\n'))
 
-    def _set_html_content(self, content: str):
+    def _set_html_content(self):
+        content = try_open_txt(self._file_path)
         # Удалим все скрипты и стили
         clean_html = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', content, flags=re.DOTALL)
 
@@ -102,27 +134,7 @@ class TextNavigator:
         # \n, который мы добавили.
         # Позиции страниц - виртуальные, по примеру из Word:
         # максимум 120 символов в строке, максимум 52 строки на странице.
-        lines_count = 0
-        start_position = 0
-        content_pars = self._file_content.split('\n')
-        # Добавляем первый абзац и первую страницу
-        self._par_positions.append(start_position)
-        self._page_positions.append(start_position)
-        for par in content_pars:
-            par_length = len(par)
-            # Добавляем позиции абзацев
-            start_position += par_length + 1
-            self._par_positions.append(start_position)
-            # Добавляем позиции страниц
-            par_lines = 1 + par_length // LINE_LENGTH_MAX  # Количество строк, занимаемое абзацем
-            if (lines_count + par_lines) == LINES_ON_HTML_PAGE:
-                self._page_positions.append(start_position)
-                lines_count = 0
-            elif (lines_count + par_lines) > LINES_ON_HTML_PAGE:
-                self._page_positions.append(start_position - par_length)
-                lines_count = par_lines
-            else:
-                lines_count += par_lines
+        self._set_positions(self._file_content.split('\n'))
 
     def _set_docx_content(self):
         document: docx.Document = docx.Document(self._file_path)
@@ -229,4 +241,4 @@ def test_navigator(file_path: str):
     print(f'Total time: {(end_time - start_time)}')
 
 
-test_navigator(os.path.abspath('test_files/xml2.xml'))
+test_navigator(os.path.abspath('test_files/odt.odt'))

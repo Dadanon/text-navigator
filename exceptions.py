@@ -8,3 +8,7 @@ class ExtensionAbsentError(Exception):
 
 class UnknownNavOptionError(Exception):
     pass
+
+
+class ODTError(Exception):
+    pass

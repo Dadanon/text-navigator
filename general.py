@@ -15,7 +15,7 @@ SUPPORTED_FORMATS = [
     'rtf',
     'doc',
     'docx',  # Ready
-    'odt',
+    'odt',  # Ready
     'htm',  # Ready
     'html',  # Ready
     'xml',  # Ready
