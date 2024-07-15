@@ -18,8 +18,10 @@ class TextNavigator:
     _extension: str  # Расширение файла
     _par_positions: List[int]  # Позиции параграфов
     _page_positions: List[int]  # Позиции страниц
+    _encoding: Optional[str]  # Актуально для txt файла как доп опция получения кодировки
 
     def __init__(self, text_file_path: str):
+        self._encoding = None
         self._par_positions = []
         self._page_positions = []
         self._file_content = ''
@@ -83,7 +85,8 @@ class TextNavigator:
     # INFO: setting content for different formats block
 
     def _set_txt_content(self):
-        content = try_open_txt(self._file_path)
+        content, encoding = try_open_txt(self._file_path)
+        self._encoding = encoding
         self._file_content = re.sub(r'\n{2,}', '\n', content.strip())
         content_chunks = self._file_content.split('\n')
         self._set_positions(content_chunks)
@@ -130,7 +133,7 @@ class TextNavigator:
         self._set_positions(content_chunks)
 
     def _set_xml_content(self):
-        content = try_open_txt(self._file_path)
+        content, _ = try_open_txt(self._file_path)
         content = re.sub(r'<\?xml.*?>\n', '', content)
         content = re.sub(r'\s{2,}', '\n', content)
         content = re.sub(r'</.*?>', ' ', content)
@@ -144,7 +147,7 @@ class TextNavigator:
         self._set_positions(self._file_content.split('\n'))
 
     def _set_html_content(self):
-        content = try_open_txt(self._file_path)
+        content, _ = try_open_txt(self._file_path)
         # Удалим все скрипты и стили
         clean_html = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', content, flags=re.DOTALL)
 
@@ -259,3 +262,10 @@ class TextNavigator:
         и содержимое для поиска позиций навигации созданы единообразно
         """
         return self._file_content
+
+    def get_encoding(self) -> Optional[str]:
+        """
+        Получение кодировки файла (выполняется попутно с получением
+        содержимого файла, не требует затрат). Актуально для txt
+        """
+        return self._encoding

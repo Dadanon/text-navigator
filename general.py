@@ -1,4 +1,5 @@
 from enum import IntEnum
+from typing import Tuple
 
 
 class NavOption(IntEnum):
@@ -26,12 +27,12 @@ SUPPORTED_FORMATS = [
 """Список будет дополняться со временем"""
 
 
-def try_open_txt(file_path: str) -> str:
+def try_open_txt(file_path: str) -> Tuple[str, str]:
     encodings = ['windows-1251', 'utf-8', 'utf-16-be', 'utf-16-le', 'koi8-r', 'mac-cyrillic', 'iso8859-5', 'cp866']
     for encoding in encodings:
         try:
             with open(file_path, 'r', encoding=encoding) as file:
-                return file.read()
+                return file.read(), encoding
         except (UnicodeDecodeError, LookupError):
             continue
     raise Exception(f"Кодировка файла {file_path} не найдена в списке {encodings}")
