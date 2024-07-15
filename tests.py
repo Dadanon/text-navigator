@@ -14,4 +14,4 @@ def navigator_test(file_path: str):
     print(f'Total time: {(end_time - start_time)}')
 
 
-navigator_test(os.path.abspath('test_files/rtf.rtf'))
+navigator_test(os.path.abspath('test_files/txt.txt'))

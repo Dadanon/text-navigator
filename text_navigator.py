@@ -46,14 +46,16 @@ class TextNavigator:
                 self._set_odt_content()
             case '.rtf':
                 self._set_rtf_content()
+            case '.txt':
+                self._set_txt_content()
             case _:
                 raise UnsupportedFormatError(f'Неподдерживаемое расширение файла: {self._file_path}')
-        print(self._file_content)
-        print('\n\nParagraph positions:\n\n')
-        print(self._par_positions)
-        print('\n\nPage positions:\n\n')
-        print(self._page_positions)
-        print(f'\n\nFile content with one page: {self._file_content[774:804]}')
+        print(self._file_content[19366:19738])
+        # print('\n\nParagraph positions:\n\n')
+        # print(self._par_positions)
+        # print('\n\nPage positions:\n\n')
+        # print(self._page_positions)
+        print(f'\n\nFile content with one page: {self._file_content[19390:19517]}')
 
     # INFO: private methods
 
@@ -79,6 +81,12 @@ class TextNavigator:
                 lines_count += par_lines
 
     # INFO: setting content for different formats block
+
+    def _set_txt_content(self):
+        content = try_open_txt(self._file_path)
+        self._file_content = re.sub(r'\n{2,}', '\n', content.strip())
+        content_chunks = self._file_content.split('\n')
+        self._set_positions(content_chunks)
 
     def _set_rtf_content(self):
         from striprtf.striprtf import rtf_to_text
