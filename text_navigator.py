@@ -1,13 +1,11 @@
 import os.path
 import re
-import time
 from typing import List, Optional, Tuple
 from zipfile import ZipFile
 import shutil
 
 import docx
 import pymupdf
-from lxml import etree
 
 from exceptions import *
 from general import NavOption, try_open_txt, LINE_LENGTH_MAX, LINES_ON_HTML_PAGE
@@ -36,6 +34,8 @@ class TextNavigator:
         match self._extension:
             case '.docx':
                 self._set_docx_content()
+            case '.doc':
+                self._set_doc_content()
             case '.pdf' | '.epub' | '.fb2':
                 self._set_pypdf_content()
             case '.htm' | '.html':
@@ -44,6 +44,8 @@ class TextNavigator:
                 self._set_xml_content()
             case '.odt':
                 self._set_odt_content()
+            case '.rtf':
+                self._set_rtf_content()
             case _:
                 raise UnsupportedFormatError(f'Неподдерживаемое расширение файла: {self._file_path}')
         print(self._file_content)
@@ -51,7 +53,7 @@ class TextNavigator:
         print(self._par_positions)
         print('\n\nPage positions:\n\n')
         print(self._page_positions)
-        print(f'\n\nFile content with one page: {self._file_content[1085:1309]}')
+        print(f'\n\nFile content with one page: {self._file_content[774:804]}')
 
     # INFO: private methods
 
@@ -77,6 +79,26 @@ class TextNavigator:
                 lines_count += par_lines
 
     # INFO: setting content for different formats block
+
+    def _set_rtf_content(self):
+        from striprtf.striprtf import rtf_to_text
+        with open(self._file_path, 'r') as file:
+            content = file.read()
+        content = rtf_to_text(content)
+        self._file_content = re.sub(r'\n{2,}', '\n', content.strip())
+        content_chunks = self._file_content.split('\n')
+        self._set_positions(content_chunks)
+
+    def _set_doc_content(self):
+        import subprocess
+
+        result = subprocess.run(['antiword', self._file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        content = result.stdout.decode()
+
+        # INFO: здесь будет пока тестовый текст, т.к. для проверки на Windows проблематично установить antiword
+        self._file_content = content
+        content_chunks = content.split('\n')
+        self._set_positions(content_chunks)
 
     def _set_odt_content(self):
         filename, _ = os.path.splitext(self._file_path)
@@ -229,16 +251,3 @@ class TextNavigator:
         и содержимое для поиска позиций навигации созданы единообразно
         """
         return self._file_content
-
-
-def test_navigator(file_path: str):
-    start_time = time.time()
-    navigator = TextNavigator(file_path)
-    # print(navigator.get_next_fragment(1609))
-    # navigator.set_nav_option(NavOption.PAGE)
-    # print(navigator.get_next_fragment(77))
-    end_time = time.time()
-    print(f'Total time: {(end_time - start_time)}')
-
-
-test_navigator(os.path.abspath('test_files/odt.odt'))

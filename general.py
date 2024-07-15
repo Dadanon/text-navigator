@@ -12,8 +12,8 @@ LINE_LENGTH_MAX = 120  # В Word длина строки максимум 120 с
 
 SUPPORTED_FORMATS = [
     'txt',
-    'rtf',
-    'doc',
+    'rtf',  # Ready
+    'doc',  # Ready (presumably)
     'docx',  # Ready
     'odt',  # Ready
     'htm',  # Ready
