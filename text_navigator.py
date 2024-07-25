@@ -52,6 +52,11 @@ class TextNavigator:
             case _:
                 raise UnsupportedFormatError(f'Неподдерживаемое расширение файла: {self._file_path}')
 
+        print(f'Paragraph positions: {self._par_positions}\n\n\n')
+        print(f'Page positions: {self._page_positions}\n\n\n')
+        print(f'Paragraph: {self._file_content[1954:2246]}\n\n\n')
+        print(f'Content length: {len(self._file_content)}\n\n\n')
+
     # INFO: private methods
 
     def _set_positions(self, chunks: List[str]):
@@ -74,6 +79,12 @@ class TextNavigator:
                 lines_count = par_lines
             else:
                 lines_count += par_lines
+        # Костылькин
+        content_length = len(self._file_content) + 1
+        if self._par_positions[-1] != content_length:
+            self._par_positions.append(content_length)
+        if self._page_positions[-1] != content_length:
+            self._page_positions.append(content_length)
 
     # INFO: setting content for different formats block
 
@@ -202,29 +213,23 @@ class TextNavigator:
             case _:
                 raise UnknownNavOptionError("Неизвестная опция навигации")
 
-    def _get_next_fragment(self, position: int) -> Optional[Tuple[int, Optional[int]]]:
+    def _get_next_fragment(self, position: int) -> Optional[Tuple[int, int]]:
         for i in range(len(self._nav_positions)):
             if self._nav_positions[i] > position:
                 start_position = self._nav_positions[i]
                 if len(self._file_content[start_position:]) == 0:
                     return None  # Вернуть None, если start_position - последняя позиция
-                try:
-                    end_position = self._nav_positions[i + 1]
-                    return start_position, end_position
-                except IndexError:
-                    return start_position, None  # Гипотетический случай, который, скорее всего, никогда не произойдет :)
+                end_position = self._nav_positions[i + 1]
+                return start_position, end_position
         return None
 
-    def _get_prev_fragment(self, position: int) -> Optional[Tuple[int, Optional[int]]]:
+    def _get_prev_fragment(self, position: int) -> Optional[Tuple[int, int]]:
         nav_positions_reversed = self._nav_positions[::-1]
         for i in range(len(nav_positions_reversed)):
             if nav_positions_reversed[i] < position:
                 start_position = nav_positions_reversed[i]
-                try:
-                    end_position = self._nav_positions[i - 1]
-                    return start_position, end_position
-                except IndexError:
-                    return start_position, None
+                end_position = self._nav_positions[i - 1]
+                return start_position, end_position
         return None
 
     # INFO: public methods
@@ -233,12 +238,12 @@ class TextNavigator:
         """Установить опцию навигации - на данный момент страница или параграф"""
         self._nav_option = option
 
-    def get_next_fragment(self, position: int) -> Optional[Tuple[int, Optional[int]]]:
+    def get_next_fragment(self, position: int) -> Optional[Tuple[int, int]]:
         """Возвращает диапазон позиций следующей опции навигации
         (параграфа или страницы) в тексте после position"""
         return self._get_next_fragment(position)
 
-    def get_prev_fragment(self, position: int) -> Optional[Tuple[int, Optional[int]]]:
+    def get_prev_fragment(self, position: int) -> Optional[Tuple[int, int]]:
         """Возвращает диапазон позиций предыдущей опции навигации
         (параграфа или страницы) в тексте после position"""
         return self._get_prev_fragment(position)
@@ -256,3 +261,19 @@ class TextNavigator:
         содержимого файла, не требует затрат). Актуально для txt
         """
         return self._encoding
+
+    def get_nav_number(self, symbol_number: int) -> int:
+        """
+        Возвращает номер текущей страницы или параграфа
+        в зависимости от текущей опции навигации, начиная от 1.
+        Возвращает -1 при ошибке (номер символа больше длины контента)
+        """
+        nav_positions = self._nav_positions
+        for i in range(len(nav_positions)):
+            if symbol_number < nav_positions[i]:
+                try:
+                    if symbol_number >= nav_positions[i - 1]:
+                        return i
+                except IndexError:
+                    return -1
+        return -1

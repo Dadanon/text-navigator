@@ -25,7 +25,7 @@ class NavOption(IntEnum):
 Установить опцию навигации (на текущий момент - по параграфам или страницам)
 ### 2. Получить следующий фрагмент
 ```
-get_next_fragment(position: int) -> Optional[Tuple[int, Optional[int]]]
+get_next_fragment(position: int) -> Optional[Tuple[int, int]]
 ```
 Получить кортеж из 2 чисел - позиций начала и конца следующей опции навигации.
 В случае, если position >= позиция последней опции навигации возвращает None.
@@ -33,7 +33,7 @@ get_next_fragment(position: int) -> Optional[Tuple[int, Optional[int]]]
 (следующая опция навигации отсутствует) возвращает None
 ### 3. Получить предыдущий фрагмент
 ```
-get_prev_fragment(position: int) -> Optional[Tuple[int, Optional[int]]]
+get_prev_fragment(position: int) -> Optional[Tuple[int, int]]
 ```
 Получить кортеж из 2 чисел - позиций начала и конца предыдущей опции навигации.
 В случае, если position <= позиция первой опции навигации возвращает None.
@@ -53,3 +53,10 @@ get_encoding() -> Optional[str]
 (актуально только для txt). Возвращает строку в виде
 'utf-8' в случае успешного чтения txt файла и None в
 остальных случаях
+### 5. Получить номер опции навигации
+```
+get_nav_number(symbol_number: int) -> int
+```
+Возвращает номер текущей страницы или параграфа
+в зависимости от текущей опции навигации, начиная от 1.
+Возвращает -1 при ошибке (номер символа больше длины контента)
