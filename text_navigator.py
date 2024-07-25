@@ -2,7 +2,6 @@ import os.path
 import re
 from typing import List, Optional, Tuple
 from zipfile import ZipFile
-import shutil
 
 import docx
 import pymupdf
@@ -52,12 +51,6 @@ class TextNavigator:
                 self._set_txt_content()
             case _:
                 raise UnsupportedFormatError(f'Неподдерживаемое расширение файла: {self._file_path}')
-        print(self._file_content[19366:19738])
-        # print('\n\nParagraph positions:\n\n')
-        # print(self._par_positions)
-        # print('\n\nPage positions:\n\n')
-        # print(self._page_positions)
-        print(f'\n\nFile content with one page: {self._file_content[19390:19517]}')
 
     # INFO: private methods
 
@@ -112,16 +105,10 @@ class TextNavigator:
         self._set_positions(content_chunks)
 
     def _set_odt_content(self):
-        filename, _ = os.path.splitext(self._file_path)
-        temp_zip = filename + '.zip'
-        shutil.copy(self._file_path, temp_zip)
-        try:
-            with ZipFile(temp_zip, 'r') as zip_file:
-                with zip_file.open('content.xml') as xml_file:
-                    xml_content = xml_file.read()
-                    content = xml_content.decode('utf-8')
-        finally:
-            os.remove(temp_zip)
+        with ZipFile(self._file_path, 'r') as zip_file:
+            with zip_file.open('content.xml') as xml_file:
+                xml_content = xml_file.read()
+                content = xml_content.decode('utf-8')
         if not content:
             raise ODTError("Файл content.xml отсутствует в ODT файле")
         # Далее работаем как с xml файлом с особенными тегами
