@@ -171,6 +171,7 @@ class TextNavigator:
         document: docx.Document = docx.Document(self._file_path)
         content_chunks = []
         current_position: int = 0
+        self._page_positions.append(current_position)
         for par in document.paragraphs:
             content_chunks.append(par.text)
             for i in range(len(par.runs)):
