@@ -4,10 +4,21 @@ from typing import List, Optional, Tuple
 from zipfile import ZipFile
 
 import docx
-import pymupdf
+try:
+    import pymupdf
+except ImportError:
+    try:
+        import fitz_old as pymupdf
+    except ImportError:
+        print('Не удалось импортировать pymupdf модуль')
 
-from exceptions import *
-from general import NavOption, try_open_txt, LINE_LENGTH_MAX, LINES_ON_HTML_PAGE
+from .exceptions import *
+from .general import (
+    NavOption,
+    LINES_ON_HTML_PAGE,
+    LINE_LENGTH_MAX,
+    try_open_txt
+)
 
 
 class TextNavigator:
@@ -52,11 +63,6 @@ class TextNavigator:
             case _:
                 raise UnsupportedFormatError(f'Неподдерживаемое расширение файла: {self._file_path}')
 
-        print(f'Paragraph positions: {self._par_positions}\n\n\n')
-        print(f'Page positions: {self._page_positions}\n\n\n')
-        print(f'Paragraph: {self._file_content[1954:2246]}\n\n\n')
-        print(f'Content length: {len(self._file_content)}\n\n\n')
-
     # INFO: private methods
 
     def _set_positions(self, chunks: List[str]):
@@ -79,12 +85,6 @@ class TextNavigator:
                 lines_count = par_lines
             else:
                 lines_count += par_lines
-        # Костылькин
-        content_length = len(self._file_content) + 1
-        if self._par_positions[-1] != content_length:
-            self._par_positions.append(content_length)
-        if self._page_positions[-1] != content_length:
-            self._page_positions.append(content_length)
 
     # INFO: setting content for different formats block
 
@@ -99,6 +99,7 @@ class TextNavigator:
         from striprtf.striprtf import rtf_to_text
         with open(self._file_path, 'r') as file:
             content = file.read()
+            a = file.tell()
         content = rtf_to_text(content)
         self._file_content = re.sub(r'\n{2,}', '\n', content.strip())
         content_chunks = self._file_content.split('\n')
@@ -116,10 +117,14 @@ class TextNavigator:
         self._set_positions(content_chunks)
 
     def _set_odt_content(self):
-        with ZipFile(self._file_path, 'r') as zip_file:
-            with zip_file.open('content.xml') as xml_file:
-                xml_content = xml_file.read()
-                content = xml_content.decode('utf-8')
+        try:
+            with ZipFile(self._file_path, 'r') as zip_file:
+                with zip_file.open('content.xml') as xml_file:
+                    xml_content = xml_file.read()
+                    content = xml_content.decode('utf-8')
+        except Exception as e:
+            print("text_navigator: error odt:", e)
+
         if not content:
             raise ODTError("Файл content.xml отсутствует в ODT файле")
         # Далее работаем как с xml файлом с особенными тегами
@@ -156,7 +161,7 @@ class TextNavigator:
         plain_text = plain_text.strip()
 
         # Заменим большое количество пробелов на знак переноса
-        plain_text = re.sub('\s{2,}', '\n', plain_text)
+        plain_text = re.sub(r'\s{2,}', '\n', plain_text)
 
         self._file_content = plain_text
 
@@ -214,23 +219,29 @@ class TextNavigator:
             case _:
                 raise UnknownNavOptionError("Неизвестная опция навигации")
 
-    def _get_next_fragment(self, position: int) -> Optional[Tuple[int, int]]:
+    def _get_next_fragment(self, position: int) -> Optional[Tuple[int, Optional[int]]]:
         for i in range(len(self._nav_positions)):
             if self._nav_positions[i] > position:
                 start_position = self._nav_positions[i]
                 if len(self._file_content[start_position:]) == 0:
                     return None  # Вернуть None, если start_position - последняя позиция
-                end_position = self._nav_positions[i + 1]
-                return start_position, end_position
+                try:
+                    end_position = self._nav_positions[i + 1]
+                    return start_position, end_position
+                except IndexError:
+                    return start_position, None  # Гипотетический случай, который, скорее всего, никогда не произойдет :)
         return None
 
-    def _get_prev_fragment(self, position: int) -> Optional[Tuple[int, int]]:
+    def _get_prev_fragment(self, position: int) -> Optional[Tuple[int, Optional[int]]]:
         nav_positions_reversed = self._nav_positions[::-1]
         for i in range(len(nav_positions_reversed)):
             if nav_positions_reversed[i] < position:
                 start_position = nav_positions_reversed[i]
-                end_position = self._nav_positions[i - 1]
-                return start_position, end_position
+                try:
+                    end_position = self._nav_positions[i - 1]
+                    return start_position, end_position
+                except IndexError:
+                    return start_position, None
         return None
 
     # INFO: public methods
@@ -239,12 +250,12 @@ class TextNavigator:
         """Установить опцию навигации - на данный момент страница или параграф"""
         self._nav_option = option
 
-    def get_next_fragment(self, position: int) -> Optional[Tuple[int, int]]:
+    def get_next_fragment(self, position: int) -> Optional[Tuple[int, Optional[int]]]:
         """Возвращает диапазон позиций следующей опции навигации
         (параграфа или страницы) в тексте после position"""
         return self._get_next_fragment(position)
 
-    def get_prev_fragment(self, position: int) -> Optional[Tuple[int, int]]:
+    def get_prev_fragment(self, position: int) -> Optional[Tuple[int, Optional[int]]]:
         """Возвращает диапазон позиций предыдущей опции навигации
         (параграфа или страницы) в тексте после position"""
         return self._get_prev_fragment(position)

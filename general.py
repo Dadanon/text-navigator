@@ -1,5 +1,6 @@
 from enum import IntEnum
 from typing import Tuple
+from charset_normalizer import from_path
 
 
 class NavOption(IntEnum):
@@ -9,7 +10,6 @@ class NavOption(IntEnum):
 
 LINES_ON_HTML_PAGE = 52  # В Word на странице максимум 52 строки (Arial, 12pt)
 LINE_LENGTH_MAX = 120  # В Word длина строки максимум 120 символов (Arial, 12pt)
-
 
 SUPPORTED_FORMATS = [
     'txt',  # Ready
@@ -28,11 +28,10 @@ SUPPORTED_FORMATS = [
 
 
 def try_open_txt(file_path: str) -> Tuple[str, str]:
-    encodings = ['windows-1251', 'utf-8', 'utf-16-be', 'utf-16-le', 'koi8-r', 'mac-cyrillic', 'iso8859-5', 'cp866']
-    for encoding in encodings:
-        try:
-            with open(file_path, 'r', encoding=encoding) as file:
-                return file.read(), encoding
-        except (UnicodeDecodeError, LookupError):
-            continue
-    raise Exception(f"Кодировка файла {file_path} не найдена в списке {encodings}")
+    encodings = ['cp1251', 'utf-8', 'utf-16-be', 'utf-16-le', 'koi8-r', 'mac-cyrillic', 'iso8859-5', 'cp866']
+
+    results = from_path(file_path, cp_isolation=encodings)
+    guess_result = results.best()
+    file_content = str(guess_result)
+    file_encoding = guess_result.encoding
+    return file_content, file_encoding
